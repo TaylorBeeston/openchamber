@@ -15,8 +15,7 @@ export function useURLSync() {
   const urlTab = (urlState as { tab: 'chat' | 'git' | 'diff' | 'terminal' | 'files' }).tab;
   const urlDirectory = (urlState as { directory: string | null }).directory;
 
-  const isUpdatingFromURL = useRef(false);
-  const isUpdatingFromStore = useRef(false);
+  const updateSourceRef = useRef<'url' | 'store' | null>(null);
 
   useEffect(() => {
     if (!isRouterActive) {
@@ -24,80 +23,47 @@ export function useURLSync() {
     }
 
     syncFromURL();
+    updateSourceRef.current = null;
   }, [isRouterActive, syncFromURL]);
 
   useEffect(() => {
-    if (!isRouterActive) {
-      return;
-    }
-
-    if (isUpdatingFromStore.current) {
+    if (!isRouterActive || updateSourceRef.current === 'store') {
       return;
     }
 
     if (urlSessionId && urlSessionId !== currentSessionId) {
       const sessionExists = sessions.some((s) => s.id === urlSessionId);
       if (sessionExists) {
-        isUpdatingFromURL.current = true;
+        updateSourceRef.current = 'url';
         setCurrentSession(urlSessionId);
-        setTimeout(() => {
-          isUpdatingFromURL.current = false;
-        }, 0);
       }
-    }
-  }, [isRouterActive, urlSessionId, currentSessionId, setCurrentSession, sessions]);
-
-  useEffect(() => {
-    if (!isRouterActive) {
-      return;
-    }
-
-    if (isUpdatingFromURL.current) {
-      return;
-    }
-
-    if (urlTab && urlTab !== activeMainTab) {
-      isUpdatingFromURL.current = true;
+    } else if (urlTab && urlTab !== activeMainTab) {
+      updateSourceRef.current = 'url';
       setActiveMainTab(urlTab);
-      setTimeout(() => {
-        isUpdatingFromURL.current = false;
-      }, 0);
     }
-  }, [isRouterActive, urlTab, activeMainTab, setActiveMainTab]);
+  }, [isRouterActive, urlSessionId, urlTab, currentSessionId, activeMainTab, setCurrentSession, setActiveMainTab, sessions]);
 
   useEffect(() => {
-    if (!isRouterActive) {
+    if (!isRouterActive || updateSourceRef.current === 'store') {
       return;
     }
 
-    if (isUpdatingFromURL.current) {
-      return;
-    }
+    let needsUpdate = false;
+    const update: { sessionId?: string | null; tab?: 'chat' | 'git' | 'diff' | 'terminal' | 'files' } = {};
 
     if (currentSessionId && currentSessionId !== urlSessionId) {
-      isUpdatingFromStore.current = true;
-      setURLState({ sessionId: currentSessionId });
-      setTimeout(() => {
-        isUpdatingFromStore.current = false;
-      }, 0);
-    }
-  }, [isRouterActive, currentSessionId, urlSessionId, setURLState]);
-
-  useEffect(() => {
-    if (!isRouterActive) {
-      return;
-    }
-
-    if (isUpdatingFromURL.current) {
-      return;
+      update.sessionId = currentSessionId;
+      needsUpdate = true;
     }
 
     if (activeMainTab && activeMainTab !== urlTab) {
-      isUpdatingFromStore.current = true;
-      setURLState({ tab: activeMainTab });
-      setTimeout(() => {
-        isUpdatingFromStore.current = false;
-      }, 0);
+      update.tab = activeMainTab;
+      needsUpdate = true;
     }
-  }, [isRouterActive, activeMainTab, urlTab, setURLState]);
+
+    if (needsUpdate) {
+      updateSourceRef.current = 'store';
+      setURLState(update);
+    }
+  }, [isRouterActive, currentSessionId, activeMainTab, urlSessionId, urlTab, setURLState]);
 }
