@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useURLState, useURLActions } from '@/stores/useURLStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { useUIStore } from '@/stores/useUIStore';
@@ -15,6 +15,9 @@ export function useURLSync() {
   const urlTab = (urlState as { tab: 'chat' | 'git' | 'diff' | 'terminal' | 'files' }).tab;
   const urlDirectory = (urlState as { directory: string | null }).directory;
 
+  const isUpdatingFromURL = useRef(false);
+  const isUpdatingFromStore = useRef(false);
+
   useEffect(() => {
     if (!isRouterActive) {
       return;
@@ -28,10 +31,18 @@ export function useURLSync() {
       return;
     }
 
+    if (isUpdatingFromStore.current) {
+      return;
+    }
+
     if (urlSessionId && urlSessionId !== currentSessionId) {
       const sessionExists = sessions.some((s) => s.id === urlSessionId);
       if (sessionExists) {
+        isUpdatingFromURL.current = true;
         setCurrentSession(urlSessionId);
+        setTimeout(() => {
+          isUpdatingFromURL.current = false;
+        }, 0);
       }
     }
   }, [isRouterActive, urlSessionId, currentSessionId, setCurrentSession, sessions]);
@@ -41,8 +52,16 @@ export function useURLSync() {
       return;
     }
 
+    if (isUpdatingFromURL.current) {
+      return;
+    }
+
     if (urlTab && urlTab !== activeMainTab) {
+      isUpdatingFromURL.current = true;
       setActiveMainTab(urlTab);
+      setTimeout(() => {
+        isUpdatingFromURL.current = false;
+      }, 0);
     }
   }, [isRouterActive, urlTab, activeMainTab, setActiveMainTab]);
 
@@ -51,8 +70,16 @@ export function useURLSync() {
       return;
     }
 
+    if (isUpdatingFromURL.current) {
+      return;
+    }
+
     if (currentSessionId && currentSessionId !== urlSessionId) {
+      isUpdatingFromStore.current = true;
       setURLState({ sessionId: currentSessionId });
+      setTimeout(() => {
+        isUpdatingFromStore.current = false;
+      }, 0);
     }
   }, [isRouterActive, currentSessionId, urlSessionId, setURLState]);
 
@@ -61,8 +88,16 @@ export function useURLSync() {
       return;
     }
 
+    if (isUpdatingFromURL.current) {
+      return;
+    }
+
     if (activeMainTab && activeMainTab !== urlTab) {
+      isUpdatingFromStore.current = true;
       setURLState({ tab: activeMainTab });
+      setTimeout(() => {
+        isUpdatingFromStore.current = false;
+      }, 0);
     }
   }, [isRouterActive, activeMainTab, urlTab, setURLState]);
 }
